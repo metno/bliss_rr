@@ -1,2 +1,2 @@
-# bliss_rr
-Bayesian statisticaL Interpolation for Spatial analySis of precipitation
+# Bayesian statistical interpolation for spatial analysis of precipitation - bliss_rr
+Program for spatial interpolation
