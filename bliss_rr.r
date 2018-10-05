@@ -1017,10 +1017,10 @@ if (file.exists(argv$iff_black)) {
 flag_in_master<-!is.na(extract(rmaster,cbind(data$x,data$y)))
 flag_in_fg<-rep(T,length(data$x))
 if (file.exists(argv$iff_fg)) 
-#  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) 
-  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) &
-              data$value > (extract(rfg,cbind(data$x,data$y))-0.2*extract(rfg,cbind(data$x,data$y)))
-
+  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) 
+# on-the-fly dqc, used for testing
+#  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) &
+#              data$value > (extract(rfg,cbind(data$x,data$y))-0.2*extract(rfg,cbind(data$x,data$y)))
 #CVmode
 if (argv$cv_mode) {
 # prId=1 MET-WMO stations
