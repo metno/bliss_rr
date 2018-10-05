@@ -1,2 +1,5 @@
-# Bayesian statistical interpolation for spatial analysis of precipitation - bliss_rr
-Program for spatial interpolation
+# bliss_rr
+Program for spatial interpolation that included multiple statistical interpolation schemes, such as:
+
+* OI_multiscale
+* OI_firstguess
