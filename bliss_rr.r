@@ -245,16 +245,16 @@ dobs_fun<-function(obs,k) {
 }
 
 #+
-`OI_RR`<-function(yo,
-                  yb,
-                  xb,
-                  gx,
-                  gy,
-                  ox,
-                  oy,
-                  Dh,
-                  eps2
-                  ) {
+`OI_RR_var`<-function(yo,
+                      yb,
+                      xb,
+                      gx,
+                      gy,
+                      ox,
+                      oy,
+                      Dh,
+                      eps2
+                      ) {
 #------------------------------------------------------------------------------
   no<-length(yo)
   ng<-length(gx)
@@ -267,29 +267,58 @@ dobs_fun<-function(obs,k) {
   ya[]<-0
   xa_errvar[]<-0
   ya_errvar[]<-0
-  out<-.C("oi_rr",ng=as.integer(ng),
-                  no=as.integer(no),
-                  SRinv=as.numeric(InvD),
-                  eps2=as.double(eps2),
-                  Dh=as.double(Dh),
-                  gx=as.double(gx),
-                  gy=as.double(gy),
-                  ox=as.double(ox),
-                  oy=as.double(oy),
-                  yo=as.double(yo),
-                  yb=as.double(yb),
-                  xb=as.double(xb),
-                  xa=as.double(xa),
-                  ya=as.double(ya),
-                  xa_errvar=as.double(xa_errvar),
-                  ya_errvar=as.double(ya_errvar),
-                  o_errvar=as.double(o_errvar))
+  out<-.C("oi_rr_var",ng=as.integer(ng),
+                      no=as.integer(no),
+                      SRinv=as.numeric(InvD),
+                      eps2=as.double(eps2),
+                      Dh=as.double(Dh),
+                      gx=as.double(gx),
+                      gy=as.double(gy),
+                      ox=as.double(ox),
+                      oy=as.double(oy),
+                      yo=as.double(yo),
+                      yb=as.double(yb),
+                      xb=as.double(xb),
+                      xa=as.double(xa),
+                      ya=as.double(ya),
+                      xa_errvar=as.double(xa_errvar),
+                      ya_errvar=as.double(ya_errvar),
+                      o_errvar=as.double(o_errvar))
   return( list(xa= out$xa[1:ng],
                ya= out$ya[1:no],
                xa_errvar= out$xa_errvar[1:ng],
                ya_errvar= out$ya_errvar[1:no],
                o_errvar= out$o_errvar))
 }
+
+#
+boxcox<-function(x,lambda) {
+  if (lambda==0) {
+    return(log(x))
+  } else {
+    return((x**lambda-1)/lambda)
+  }
+}
+
+#+
+tboxcox4pdf<-function(mean,sd,lambda) {
+  if (mean<bcrrinf) return(c(0,0,0,0,0,0))
+  aux<-qnorm(mean=mean,sd=sd,p=seq(1/400,(1-1/400),length=399))
+  if (lambda!=0) aux[aux<(-1/lambda)]<-(-1/lambda)
+  return(c(mean(tboxcox(aux,lambda=lambda)),
+           as.vector(quantile(tboxcox(aux,lambda=lambda),
+                              probs=c(0.25,0.75)))))
+}
+
+#+
+tboxcox<-function(x,lambda) {
+  if (lambda==0) {
+    return(exp(x))
+  } else {
+    return((1+lambda*x)**(1./lambda))
+  }
+}
+
 
 #
 #==============================================================================
@@ -1219,15 +1248,15 @@ print(round(xa[1:10],4))
   diag(D)<-diag(D)+argv$eps2
   InvD<-chol2inv(chol(D))
   t00<-Sys.time()
-  res<-OI_RR(yo=yo,
-             yb=yb,
-             xb=xb,
-             gx=xgrid[aix],
-             gy=ygrid[aix],
-             ox=VecX,
-             oy=VecY,
-             Dh=argv$Dh,
-             eps2=argv$eps2)
+  res<-OI_RR_var(yo=yo,
+                 yb=yb,
+                 xb=xb,
+                 gx=xgrid[aix],
+                 gy=ygrid[aix],
+                 ox=VecX,
+                 oy=VecY,
+                 Dh=argv$Dh,
+                 eps2=argv$eps2)
   t11<-Sys.time()
   print(paste("OI_RR, time=",round(t11-t00,1),attr(t11-t00,"unit")))
 save.image("tmp.RData")  
