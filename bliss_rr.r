@@ -244,6 +244,52 @@ dobs_fun<-function(obs,k) {
   out$xa[1:ng]
 }
 
+#+
+`OI_RR`<-function(yo,
+                  yb,
+                  xb,
+                  gx,
+                  gy,
+                  ox,
+                  oy,
+                  Dh,
+                  eps2
+                  ) {
+#------------------------------------------------------------------------------
+  no<-length(yo)
+  ng<-length(gx)
+  xa<-vector(mode="numeric",length=ng)
+  ya<-vector(mode="numeric",length=no)
+  xa_errvar<-vector(mode="numeric",length=ng)
+  ya_errvar<-vector(mode="numeric",length=no)
+  o_errvar<-0
+  xa[]<-0
+  ya[]<-0
+  xa_errvar[]<-0
+  ya_errvar[]<-0
+  out<-.C("oi_rr",ng=as.integer(ng),
+                  no=as.integer(no),
+                  SRinv=as.numeric(InvD),
+                  eps2=as.double(eps2),
+                  Dh=as.double(Dh),
+                  gx=as.double(gx),
+                  gy=as.double(gy),
+                  ox=as.double(ox),
+                  oy=as.double(oy),
+                  yo=as.double(yo),
+                  yb=as.double(yb),
+                  xb=as.double(xb),
+                  xa=as.double(xa),
+                  ya=as.double(ya),
+                  xa_errvar=as.double(xa_errvar),
+                  ya_errvar=as.double(ya_errvar),
+                  o_errvar=as.double(o_errvar))
+  return( list(xa= out$xa[1:ng],
+               ya= out$ya[1:no],
+               xa_errvar= out$xa_errvar[1:ng],
+               ya_errvar= out$ya_errvar[1:no],
+               o_errvar= out$o_errvar))
+}
 
 #
 #==============================================================================
@@ -713,6 +759,7 @@ if ( !(file.exists(argv$path2src)) )
 # load external C functions
 dyn.load(file.path(argv$path2src,"oi_rr_first.so"))
 dyn.load(file.path(argv$path2src,"oi_rr_fast.so"))
+dyn.load(file.path(argv$path2src,"oi_rr.so"))
 #
 #------------------------------------------------------------------------------
 # Create master grid
@@ -891,9 +938,15 @@ if (file.exists(argv$iff_fg)) {
   rfg<-raux$stack; rm(raux)
   if (!rasters_match(rfg,rmaster)) rfg<-projectRaster(rfg,rmaster)
   rfg<-mask(rfg,rmaster)
-  xb<-getValues(rfg)
-  aix<-which(!is.na(xb))
-  xb<-xb[aix]
+  xb0<-getValues(rfg)
+  aix<-which(!is.na(xb0))
+  xb<-xb0[aix]
+  rm(xb0)
+  if (argv$verbose) {
+    print("+---------------------------------------------------------------+")
+    print(paste("+ first guess ",argv$iff_fg))
+  }
+
 }
 #
 #------------------------------------------------------------------------------
@@ -1150,6 +1203,7 @@ if (argv$mode=="OI_firstguess") {
   D<-exp(-0.5*(Disth/argv$Dh)**2.)
   diag(D)<-diag(D)+argv$eps2
   InvD<-chol2inv(chol(D))
+  t00<-Sys.time()
   xa<-OI_RR_fast(yo=yo,
                  yb=yb,
                  xb=xb,
@@ -1157,7 +1211,27 @@ if (argv$mode=="OI_firstguess") {
                  ygrid=ygrid[aix],
                  VecX=VecX,
                  VecY=VecY,
-                 Dh=argv$Dh) 
+                 Dh=argv$Dh)
+  t11<-Sys.time()
+  print(paste("OI_RR_fast, time=",round(t11-t00,1),attr(t11-t00,"unit")))
+print(round(xa[1:10],4))
+  D<-exp(-0.5*(Disth/argv$Dh)**2.)
+  diag(D)<-diag(D)+argv$eps2
+  InvD<-chol2inv(chol(D))
+  t00<-Sys.time()
+  res<-OI_RR(yo=yo,
+             yb=yb,
+             xb=xb,
+             gx=xgrid[aix],
+             gy=ygrid[aix],
+             ox=VecX,
+             oy=VecY,
+             Dh=argv$Dh,
+             eps2=argv$eps2)
+  t11<-Sys.time()
+  print(paste("OI_RR, time=",round(t11-t00,1),attr(t11-t00,"unit")))
+save.image("tmp.RData")  
+q()
   ra<-rmaster
   ra[]<-NA
   ra[aix]<-xa
