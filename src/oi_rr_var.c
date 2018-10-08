@@ -114,12 +114,12 @@ void oi_rr_var(int *ng,
   for (j=0;j<no[0];j++) {
     ya_errvar[j]= b_errvar*ya_errvar[j];
   }
-  thr=7;
+  thr=7*7;
   /* loop over grid points & observation points at the same time */
   for (i=0;i<ng[0];i++) {
-    if ( i % 10000 == 0) {
+/*    if ( i % 10000 == 0) {
       printf("%d / %d \n", i,ng[0]);
-    }
+    }*/
     no_i=0;
     for (j=0;j<no[0];j++) {
       hd2_ij=((gx[i]-ox[j])*(gx[i]-ox[j])+(gy[i]-oy[j])*(gy[i]-oy[j])) / (1000.*1000.);

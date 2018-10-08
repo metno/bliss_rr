@@ -301,13 +301,17 @@ boxcox<-function(x,lambda) {
 }
 
 #+
-tboxcox4pdf<-function(mean,sd,lambda) {
-  if (mean<bcrrinf) return(c(0,0,0,0,0,0))
-  aux<-qnorm(mean=mean,sd=sd,p=seq(1/400,(1-1/400),length=399))
+tboxcox4pdf_apply<-function(par,
+                            lambda,
+                            brrinf,
+                            int=400) {
+  mean<-par[1]
+  sd<-par[2]
+  if (mean<brrinf) return(0)
+  if (sd==0) return(tboxcox(mean,lambda))
+  aux<-qnorm(mean=mean,sd=sd,p=seq(1/int,(1-1/int),length=(int-1)))
   if (lambda!=0) aux[aux<(-1/lambda)]<-(-1/lambda)
-  return(c(mean(tboxcox(aux,lambda=lambda)),
-           as.vector(quantile(tboxcox(aux,lambda=lambda),
-                              probs=c(0.25,0.75)))))
+  mean(tboxcox(aux,lambda=lambda))
 }
 
 #+
@@ -737,6 +741,17 @@ p <- add_argument(p, "--off_grd.cell_methods",
                   type="cell aggregation method",
                   default="none")
 #------------------------------------------------------------------------------
+# gaussian anamorphosis
+p <- add_argument(p, "--transf",
+                  help="transformation used in the gaussian anamorphosis (\"none\",\"Box-Cox\")",
+                  type="character",
+                  default="none")
+p <- add_argument(p, "--transf.boxcox_lambda",
+                  help="Box-Cox power parameter",
+                  type="numeric",
+                  default=NA)
+
+#------------------------------------------------------------------------------
 #
 argv <- parse_args(p)
 #
@@ -788,7 +803,7 @@ if ( !(file.exists(argv$path2src)) )
 # load external C functions
 dyn.load(file.path(argv$path2src,"oi_rr_first.so"))
 dyn.load(file.path(argv$path2src,"oi_rr_fast.so"))
-dyn.load(file.path(argv$path2src,"oi_rr.so"))
+dyn.load(file.path(argv$path2src,"oi_rr_var.so"))
 #
 #------------------------------------------------------------------------------
 # Create master grid
@@ -1099,10 +1114,10 @@ if (file.exists(argv$iff_black)) {
 flag_in_master<-!is.na(extract(rmaster,cbind(data$x,data$y)))
 flag_in_fg<-rep(T,length(data$x))
 if (file.exists(argv$iff_fg)) 
-  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) 
+#  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) 
 # on-the-fly dqc, used for testing
-#  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) &
-#              data$value > (extract(rfg,cbind(data$x,data$y))-0.2*extract(rfg,cbind(data$x,data$y)))
+  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) &
+              data$value > (extract(rfg,cbind(data$x,data$y))-0.2*extract(rfg,cbind(data$x,data$y)))
 #CVmode
 if (argv$cv_mode) {
 # prId=1 MET-WMO stations
@@ -1225,6 +1240,10 @@ Disth<-(outer(VecY,VecY,FUN="-")**2.+
 #------------------------------------------------------------------------------
 # ANALYSIS
 # ===> OI with background  <===
+  if (argv$verbose) {
+    print("+---------------------------------------------------------------+")
+    print("Analysis")
+  }
 if (argv$mode=="OI_firstguess") {
   yb<-extract(rfg,
               cbind(VecX,VecY),
@@ -1232,52 +1251,83 @@ if (argv$mode=="OI_firstguess") {
   D<-exp(-0.5*(Disth/argv$Dh)**2.)
   diag(D)<-diag(D)+argv$eps2
   InvD<-chol2inv(chol(D))
-  t00<-Sys.time()
-  xa<-OI_RR_fast(yo=yo,
-                 yb=yb,
-                 xb=xb,
-                 xgrid=xgrid[aix],
-                 ygrid=ygrid[aix],
-                 VecX=VecX,
-                 VecY=VecY,
-                 Dh=argv$Dh)
-  t11<-Sys.time()
-  print(paste("OI_RR_fast, time=",round(t11-t00,1),attr(t11-t00,"unit")))
-print(round(xa[1:10],4))
-  D<-exp(-0.5*(Disth/argv$Dh)**2.)
-  diag(D)<-diag(D)+argv$eps2
-  InvD<-chol2inv(chol(D))
-  t00<-Sys.time()
-  res<-OI_RR_var(yo=yo,
-                 yb=yb,
-                 xb=xb,
-                 gx=xgrid[aix],
-                 gy=ygrid[aix],
-                 ox=VecX,
-                 oy=VecY,
-                 Dh=argv$Dh,
-                 eps2=argv$eps2)
-  t11<-Sys.time()
-  print(paste("OI_RR, time=",round(t11-t00,1),attr(t11-t00,"unit")))
-save.image("tmp.RData")  
-q()
+  if (argv$transf=="none") {
+    xa<-OI_RR_fast(yo=yo,
+                   yb=yb,
+                   xb=xb,
+                   xgrid=xgrid[aix],
+                   ygrid=ygrid[aix],
+                   VecX=VecX,
+                   VecY=VecY,
+                   Dh=argv$Dh)
+  } else if (argv$transf=="Box-Cox") {
+    t00<-Sys.time()
+    res<-OI_RR_var(yo=boxcox(yo,argv$transf.boxcox_lambda),
+                   yb=boxcox(yb,argv$transf.boxcox_lambda),
+                   xb=boxcox(xb,argv$transf.boxcox_lambda),
+                   gx=xgrid[aix],
+                   gy=ygrid[aix],
+                   ox=VecX,
+                   oy=VecY,
+                   Dh=argv$Dh,
+                   eps2=argv$eps2)
+    t11<-Sys.time()
+    if (argv$verbose) print(paste("OI_RR, time=",round(t11-t00,1),attr(t11-t00,"unit")))
+    t00<-Sys.time()
+    xa<-apply(cbind(res$xa,sqrt(abs(res$xa_errvar))),
+              MARGIN=1,
+              FUN=tboxcox4pdf_apply,
+                  lambda=argv$transf.boxcox_lambda,
+                  brrinf=boxcox(argv$rrinf,argv$transf.boxcox_lambda))
+    t11<-Sys.time()
+    if (argv$verbose) print(paste("backtransf, time=",round(t11-t00,1),attr(t11-t00,"unit")))
+  } else {
+    boom("transformation not defined")
+  }
   ra<-rmaster
   ra[]<-NA
   ra[aix]<-xa
   rm(rfg,xb,xa,aix,xgrid,ygrid)
   if (argv$loocv_mode) {
-    ya<-OI_RR_fast(yo=yo,
-                   yb=yb,
-                   xb=yb,
-                   xgrid=VecX,
-                   ygrid=VecY,
-                   VecX=VecX,
-                   VecY=VecY,
-                   Dh=argv$Dh)
     W<-tcrossprod((D-argv$eps2*diag(n0)),InvD)
-    yav<-yo + 1./(1.-diag(W)) * (ya-yo)
+    if (argv$transf=="none") {
+      ya<-OI_RR_fast(yo=yo,
+                     yb=yb,
+                     xb=yb,
+                     xgrid=VecX,
+                     ygrid=VecY,
+                     VecX=VecX,
+                     VecY=VecY,
+                     Dh=argv$Dh)
+      yav<-yo + 1./(1.-diag(W)) * (ya-yo)
+    } else if (argv$transf=="Box-Cox") {
+      ya<-apply(cbind(res$ya,sqrt(abs(res$ya_errvar))),
+                MARGIN=1,
+                FUN=tboxcox4pdf_apply,
+                    lambda=argv$transf.boxcox_lambda,
+                    brrinf=boxcox(argv$rrinf,argv$transf.boxcox_lambda))
+      yavbc<-boxcox(yo,argv$transf.boxcox_lambda) + 
+             1./(1.-diag(W)) * (res$ya-boxcox(yo,argv$transf.boxcox_lambda))
+      # this is from Lussana et al (2010), Eq.(19) 
+      yavbc_errvar<-res$o_errvar/argv$eps2*(diag(InvD)-res$o_errvar)
+      yav<-apply(cbind(yavbc,
+                       sqrt(abs(yavbc_errvar))),
+                       MARGIN=1,
+                       FUN=tboxcox4pdf_apply,
+                           lambda=argv$transf.boxcox_lambda,
+                           brrinf=boxcox(argv$rrinf,argv$transf.boxcox_lambda))
+    }
+  # loo-crossvalidation not required
   } else {
-    ya<-extract(ra,cbind(VecX,VecY),method="bilinear")
+    if (argv$transf=="none") {
+      ya<-extract(ra,cbind(VecX,VecY),method="bilinear")
+    } else if (argv$transf=="Box-Cox") {
+      ya<-apply(cbind(res$ya,sqrt(abs(res$ya_errvar))),
+                MARGIN=1,
+                FUN=tboxcox4pdf_apply,
+                    lambda=argv$transf.boxcox_lambda,
+                    brrinf=boxcox(argv$rrinf,argv$transf.boxcox_lambda))
+    }
     yav<-rep(-9999,length(ya))
   }
   if (argv$idiv_instead_of_elev) {
