@@ -1,6 +1,6 @@
 # bliss_rr
 
-Program for spatial interpolation that allows to choose between multiple statistical interpolation schemes, such as:
+Multiple statistical interpolation schemes have been implemented, such as:
 
 * OI_multiscale. Modified Optimal Interpolation based on observations only.
 * OI_firstguess. Optimal Interpolation based on the combination of observations with a background field. It is possible to specify a data transformation as a pre-processing step (i.e., Gaussian anamorphosis).
