@@ -92,75 +92,6 @@ debug_01_plots<-function() {
   points(VecX[ixdry],VecY[ixdry],pch=19,col="red",cex=0.5)
   dev.off()
 }
-# + write output files in case of no-precipitation over the whole domain
-writeIfNoPrec<-function(){
-  cat("# variable: Precipitation\n",file=out.file.ver,append=F)
-  cat("# units: $mm$\n",file=out.file.ver,append=T)
-  cat("date     leadtime location  lat     lon      altitude obs      fcst\n",
-      file=out.file.ver,append=T)
-  ix<-which(ydqc.flag<=0 & !is.na(yo))
-  cat(paste( yyyymmdd," ",
-             rep(0,length(ix))," ",
-             VecS[ix]," ",
-             VecLat[ix]," ",
-             VecLon[ix]," ",
-             VecZ[ix]," ",
-             round(yo[ix],1)," ",
-             rep(0,length(ix)),"\n",
-             sep=""),
-      file=out.file.ver,append=T)
-  print(paste("data saved on file",out.file.ver))
-  cat("yyyy;mm;dd;stid;x;y;z;yo;ya;dqc;\n",
-      file=out.file.stn,append=F)
-  cat(paste(yyyy,mm,dd,
-            formatC(VecS,format="f",digits=0),
-            formatC(VecX,format="f",digits=0),
-            formatC(VecY,format="f",digits=0),
-            formatC(VecZ,format="f",digits=0),
-            formatC(yo,format="f",digits=1),
-            rep(0,length(yo)), #ya
-            formatC(ydqc.flag,format="f",digits=0),
-            "\n",sep=";"),
-      file=out.file.stn,append=T)
-  print(paste("data saved on file",out.file.stn))
-  # grid 
-  r.aux <-raster(ncol=nx, nrow=ny,
-                    xmn=xmn, xmx=xmx,
-                    ymn=ymn, ymx=ymx,
-                    crs=proj4.utm33)
-  xa<-vector(mode="numeric",length=ngrid)
-  xa[]<-0
-  r.aux[mask]<-round(xa,1)
-  r.list<-list()
-  r.list[[1]]<-matrix(data=getValues(r.aux),
-                      ncol=length(y),
-                      nrow=length(x))
-  out<-nc4out(grid.list=r.list,
-              times=tstamp_nc,
-              file.name=out.file.grd,
-              grid.type="utm33",
-              x=x,
-              y=y,
-              var.name=argv$variable,
-              var.longname=varlongname,
-              var.standardname=varstandardname,
-              var.version=varversion,
-              times.unit="H",
-              reference=reference,
-              proj4.string=proj4.utm33,
-              var.unit=varunit,
-              lonlat.out=T,
-              round.dig=diground,
-              summary=summary,
-              source.string=sourcestring,
-              title=title,
-              comment=comment,
-              atts.var.add=NULL,
-              var.cell_methods=cell_methods,
-              time_bnds=time_bnds,
-              cf_1.7=T)
-  print(paste("data saved on file",out.file.grd))
-}
 
 #+ find the n-th largest element from each matrix row 
 findRow <- function (x,n) {   
@@ -988,9 +919,7 @@ if (file.exists(argv$iff_fg)) {
   rm(xb0)
   if (argv$verbose) {
     print("+---------------------------------------------------------------+")
-    print(paste("+ first guess ",argv$iff_fg))
   }
-
 }
 #
 #------------------------------------------------------------------------------
@@ -1114,10 +1043,10 @@ if (file.exists(argv$iff_black)) {
 flag_in_master<-!is.na(extract(rmaster,cbind(data$x,data$y)))
 flag_in_fg<-rep(T,length(data$x))
 if (file.exists(argv$iff_fg)) 
-#  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) 
+  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) 
 # on-the-fly dqc, used for testing
-  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) &
-              data$value > (extract(rfg,cbind(data$x,data$y))-0.2*extract(rfg,cbind(data$x,data$y)))
+#  flag_in_fg<-!is.na(extract(rfg,cbind(data$x,data$y))) &
+#              data$value > (extract(rfg,cbind(data$x,data$y))-0.2*extract(rfg,cbind(data$x,data$y)))
 #CVmode
 if (argv$cv_mode) {
 # prId=1 MET-WMO stations
@@ -1172,12 +1101,12 @@ ixdry<-which(yo< argv$rrinf)
 nwet<-length(ixwet)
 ndry<-length(ixdry)
 # Easy-peasy
-if (nwet==0) {
-  if (argv$verbose) print("no rain over the whole domain")
-  writeIfNoPrec()
-  if (argv$verbose) print("Success exit")
-  quit(status=0)
-}
+#if (nwet==0) {
+#  if (argv$verbose) print("no rain over the whole domain")
+#  writeIfNoPrec()
+#  if (argv$verbose) print("Success exit")
+#  quit(status=0)
+#}
 # observation error variance correction factor
 ovarc<-rep(1,n0)
 if (any(!is.na(argv$ovarc.prId))) {
@@ -1645,7 +1574,7 @@ if (argv$cv_mode) {
                    var.cell_methods=argv$off_grd.cell_methods,
                    time_bnds=time_bnds,
                    cf_1.7=T)
-  print(paste("data saved on file",argv$off_grd.grid))
+  print(paste("data saved on file",argv$off_grd))
 }
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 # normal exit
